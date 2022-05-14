@@ -1,0 +1,71 @@
+function [xk, k, XK] = lsBFGSwithErrors( f, g, x0, l, maxiter, tol, fexact )
+% Purpose: approximate a local min of f using the linesearch algorithm
+% and the (iBGFS) update formula (to avoid the solution of linear systems)
+% in a modified version suggested by Xie, Byrd , and Nocedal in "Analysis
+% of the BFGS method with errors". The lengthening parameter l is
+% introduced.
+%
+% In :  f       : noisy objectve function (handle)
+%       g       : noisy gradient from objective function (handle)
+%       l       : lengthening parameter
+%       x0      : starting point
+%       maxiter : maximum number of iterations to perform
+%       tol     : tolerance for the norm of the noisy gradient
+%
+% Out:  xk    : approximation to the minimum
+%       k     : number of iterations done
+%       XK    : extras
+
+    k = 0;
+    n = length( x0 );
+    I = speye( n );
+    H = speye( n );
+    gk = g( x0 );
+    gnew = gk;
+    xk = x0;
+
+    % extras
+    N = length(xk);
+    xstar = zeros(N,1); %analytic minimum
+    fk_noisy(1) = f(xk); % f(xk)
+    fk(1) = fexact(xk);
+    norm_g(1) = norm(gnew,2);
+    abs_e(1) = norm(xstar - xk,2);
+
+    while norm( gk ) > tol
+        dk = -H*gk;
+
+        [alpha] = encAlpha( f, xk, dk, gk, g );
+
+        if norm(alpha*dk) >= l
+            s = alpha*dk;
+        else
+            s = l*dk/norm(dk);
+        end
+        
+        gnew = g( xk + s );
+
+        xk = xk + s;
+        gamma = gnew - gk;
+        rho = 1/dot( s, gamma );
+        
+        H = (I - rho*s*gamma')*H*(I - rho*gamma*s') + rho*(s*s');
+        gk = gnew;
+        k = k+1; 
+        
+        % extras
+        fk_noisy(k + 1) = f(xk); % f(xk)
+        fk( k+1 ) = fexact(xk);
+        norm_g(k + 1) = norm(gnew,2);
+        abs_e(k + 1) = norm(xstar - xk,2);
+        
+        if  k >= maxiter  % forces to stop if we've reached a lot of iterations
+            break
+        end
+        
+        
+    end
+%   extras
+    XK = [(0:k)', norm_g', fk_noisy', fk', abs_e'];
+           
+end
